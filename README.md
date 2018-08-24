@@ -3,6 +3,6 @@ Simulation of single-particle dynamics in a levitated dipole field with rotating
 
 F.Sciortino & H.Saitoh, 2018
 
-![alt text](apexd_rw_sim/simion_Efields/ver.5/5.jpg )
+![alt text](https://user-images.githubusercontent.com/25516628/44595077-4ce25800-a7c8-11e8-91fb-f2cb409a079c.png)
 
  
