@@ -1,9 +1,9 @@
 !    -*- f90 -*-
 ! Note: the context of this file is case sensitive.
 
-python module bbr_particle ! in 
-    interface  ! in :bbr_particle
-        module mod_variable ! in :bbr_particle:bbr_particle.f90
+python module apexd_rw_sim ! in 
+    interface  ! in :apexd_rw_sim
+        module mod_variable ! in :apexd_rw_sim:bbr_particle.f90
             integer :: iexb
             double precision dimension(52) :: ci
             double precision :: zmax
@@ -15,8 +15,7 @@ python module bbr_particle ! in
             double precision :: zmin
             double precision dimension(52) :: xcl
             double precision, parameter,optional :: xe=1.6021766208d-19
-            double precision dimension(105,105,105,4) :: ezm
-            integer :: iele
+            double precision dimension(52,52,52,8) :: ezm
             integer :: n0y
             integer :: n0x
             integer :: n0z
@@ -27,8 +26,7 @@ python module bbr_particle ! in
             double precision :: ymax
             double precision dimension(12) :: vac
             double precision :: fel
-            integer :: iexe
-            double precision dimension(105,105,105,4) :: eym
+            double precision dimension(52,52,52,8) :: eym
             integer :: nx
             integer :: ny
             integer :: nz
@@ -37,19 +35,13 @@ python module bbr_particle ! in
             double precision dimension(12) :: vel
             double precision, parameter,optional :: pi=3.14159265358979323846d0
             double precision dimension(205) :: mt1z
-            double precision :: vfp1
-            double precision :: vfp2
-            double precision :: vfp3
-            double precision :: vfp4
-            double precision :: vfp5
-            double precision :: vfp6
+            integer :: iele
             double precision dimension(52) :: ycl
             double precision :: dz
             double precision :: dx
             double precision :: dy
-            integer :: ielep
             double precision :: fgrad
-            double precision dimension(105,105,105,4) :: exm
+            double precision dimension(52,52,52,8) :: exm
             double precision, parameter,optional :: eom=1.7588200236d11
             double precision dimension(12) :: vdc
             double precision dimension(1,1,1) :: bxm
@@ -57,7 +49,7 @@ python module bbr_particle ! in
             double precision dimension(1,1,1) :: bzm
             double precision :: phrw
         end module mod_variable
-        subroutine bbr_particle(pmx,pmy,pmz,pmk1,pmk2,pma,pmrwa,pmrwf,pmrwfg,pmrwd,fpm1,fpm2,fpm3,fpm4,fpm5,fpm6,ipmt,dt,iend,imbk,imbk2,te1,ci1,rc1,pid,evers,stt,stx,sty,stz,str,stgx,stgy,stgz,stgr,stk,stkpr,stkpp,stps1,stps2,stmu,strt) ! in :bbr_particle:bbr_particle.f90
+        subroutine bbr_sim(pmx,pmy,pmz,pmk1,pmk2,pma,pmrwa,pmrwf,pmrwfg,pmrwd,ipmt,dt,iend,imbk,imbk2,te1,ci1,rc1,pid,iexe,mm,evers) ! in :apexd_rw_sim:bbr_particle.f90
             use mod_variable
             double precision dimension(ipmt),intent(in) :: pmx
             double precision dimension(ipmt),intent(in),depend(ipmt) :: pmy
@@ -69,42 +61,22 @@ python module bbr_particle ! in
             double precision dimension(ipmt),intent(in),depend(ipmt) :: pmrwf
             double precision dimension(ipmt),intent(in),depend(ipmt) :: pmrwfg
             double precision dimension(ipmt),intent(in),depend(ipmt) :: pmrwd
-            double precision dimension(ipmt),intent(in),depend(ipmt) :: fpm1
-            double precision dimension(ipmt),intent(in),depend(ipmt) :: fpm2
-            double precision dimension(ipmt),intent(in),depend(ipmt) :: fpm3
-            double precision dimension(ipmt),intent(in),depend(ipmt) :: fpm4
-            double precision dimension(ipmt),intent(in),depend(ipmt) :: fpm5
-            double precision dimension(ipmt),intent(in),depend(ipmt) :: fpm6
             integer optional,intent(in,hide), &
                  check(shape(pmx,0)==ipmt), depend(pmx) :: ipmt=shape(pmx,0)
             double precision intent(in) :: dt
-            integer(kind=8) intent(in) :: iend
+            integer intent(in) :: iend
             integer intent(in) :: imbk
             integer intent(in) :: imbk2
             double precision intent(in) :: te1
             double precision intent(in) :: ci1
             double precision intent(in) :: rc1
             integer intent(in) :: pid
+            integer intent(in) :: iexe
+            integer intent(in) :: mm
             integer intent(in) :: evers
-            double precision dimension(105,10005),intent(out) :: stt
-            double precision dimension(105,10005),intent(out) :: stx
-            double precision dimension(105,10005),intent(out) :: sty
-            double precision dimension(105,10005),intent(out) :: stz
-            double precision dimension(105,10005),intent(out) :: str
-            double precision dimension(105,10005),intent(out) :: stgx
-            double precision dimension(105,10005),intent(out) :: stgy
-            double precision dimension(105,10005),intent(out) :: stgz
-            double precision dimension(105,10005),intent(out) :: stgr
-            double precision dimension(105,10005),intent(out) :: stk
-            double precision dimension(105,10005),intent(out) :: stkpr
-            double precision dimension(105,10005),intent(out) :: stkpp
-            double precision dimension(105,10005),intent(out) :: stps1
-            double precision dimension(105,10005),intent(out) :: stps2
-            double precision dimension(105,10005),intent(out) :: stmu
-            double precision dimension(105,10005),intent(out) :: strt
-        end subroutine bbr_particle
+        end subroutine bbr_sim
     end interface 
-end python module bbr_particle
+end python module apexd_rw_sim
 
 ! This file was auto-generated with f2py (version:2).
 ! See http://cens.ioc.ee/projects/f2py2e/

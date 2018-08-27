@@ -2,8 +2,6 @@ from __future__ import division
 import numpy as np
 import matplotlib.pyplot as plt
 plt.ion()
-#from bbr_particle import *
-import apexd_rw_sim
 from mpl_toolkits.mplot3d import Axes3D
 from collections import OrderedDict
 from matplotlib.pyplot import cm
@@ -15,7 +13,6 @@ import matplotlib as mpl
 mpl.rcParams['xtick.labelsize'] = 14
 mpl.rcParams['ytick.labelsize'] = 14
 mpl.rcParams['axes.labelsize'] = 14
-
 import os
 import multiprocessing
 import pdb
@@ -32,36 +29,64 @@ with warnings.catch_warnings():
 
 # Run in virtualenv 'aenv' to use emcee
 from emcee.interruptible_pool import InterruptiblePool
+
+# APEX-D Particle Dynamics Simulation library
+import apds
+
 me=9.10938356e-31
 qe=1.6e-19
 np.random.seed(433) # fix for reproducibility
 
-run_f90=False
 plot_distr=False
-parallel_run=True
-if run_f90:
-    command='./bbr.exe'
-    subprocess.call(command)
 
-# =============================================
-# Initial parameters randomization
+# ==================== Simulation settings ========================= #
 num_particles=1
-colors=cm.rainbow(np.linspace(0,1,num_particles))
 
-# distribution in (x,z), with y=0
-# coil of radius 0.1. Cannot run particles on the current loop!
+# Spatial distribution in (x,y=0,z). Coil normally of radius 0.1.
+# NB: Cannot run particles on the current loop itself! 
 rad= 1e-10 #0.001
 norm_mu=np.asarray([0.2,0.0])
 cov=np.asarray([[rad,0.0],[0.0,rad]])
+
+# Parameters for Gaussian distribution for parallel energy:
+Kpar_mean=5.0; Tpar=1.0; Tperp=1.0;
+
+# Time step:
+dt = 1.0e-12
+
+# Choose type of run: 0: 1us, 1: 10us, 2: 100us, 3: 1ms, 4: 10ms
+run_type = 1
+
+If=1.0e3      # Current \propto magnetic field intensity
+Rc=0.1         # radius of coil
+rwa=4.5      # RW field amplitude
+rwf=1.0e5    # RW starting frequency
+rwfg=5.0e9   # RW frequency gradient
+rwd=1.0      # RW direction: +1 -> p+ drift direction, -1 -> e- drift direction
+
+# RW E-field option: (0) Use E=0 always, everywhere;
+#                    (1) Use ideal azimuthal E-field;
+#                    (2) Read E-field file from  "./simion_Efields/ver.#". 
+#                    (3) Locally-rotating E-field vortex
+iexe = 2
+
+Efile=7 # Choose which electric field file to load (only used if iexe!=2)
+tE1=4. # Turn off rotating wall E-field at tE1 [s]
+mm=1 # mode number for azimuthal field case
+
+# B-field option: (0): Biot-Savart calculation (standard)
+#                 (1): set Bz=0.1 everywhere
+#                 (2): use external B field file (not well tested)
+iexb = 0
+
+# ============= Commands interpretation =============== #
+colors=cm.rainbow(np.linspace(0,1,num_particles))
+
 ttt=np.random.multivariate_normal(norm_mu,cov,num_particles)
 pmx=ttt[:,0]; pmz=ttt[:,1]
 pmy=[0.0,]*len(pmx)
 
-# Gaussian distribution for parallel energy
-#Tfl=5.0; Tpar=1.0e-5; Tperp=1.0e-5;
-Tfl=5.0; Tpar=1.0; Tperp=1.0;
-Kpar = np.random.normal(Tfl,Tpar,num_particles)
-# Kperp = np.random.exponential(Tperp,num_particles)
+Kpar = np.random.normal(Kpar_mean,Tpar,num_particles)
 Kperp = maxwell.rvs(loc=0.0,scale=Tperp,size=num_particles)
 pma = 2*np.pi*np.random.random(num_particles)
 
@@ -71,49 +96,31 @@ for comb in zip(Kperp,Kpar):
     vperp,vpar=comb
     theta0.append(math.atan2(vperp,vpar))
 
-# set iend/imbk < 10,000
-dt = 1.0e-12
-# Very short, very detailed path:
-#iend = 1.0e6
-#imbk = 1.0e2
-#imbk2 = 1.0e2
-# Short, detailed path:
-iend = 1.0e8 # 1.0e7 gives 10us
-imbk = 5.0e4
-imbk2 = 5.0e4
-# Long, not-so-detailed path:
-#iend = 1.0e10 #1.0e7#1.0e9   #15000000
-#imbk = 5e4#1.0e3 #5 #1.0e7
-#imbk2 = 5e4#1.0e3 #5 #1.0e7
+# Depending on "run_type", set different lengths and detail of simulation
+if run_type==0:
+    iend=1.0e3 #iend = 1.0e6
+    downsampling = 1.0e1 
+elif run_type==1:
+    iend = 1.0e7
+    downsampling = 1.0e3
+elif run_type==2:
+    iend = 1.0e8
+    downsampling = 1.0e4
+elif run_type==3:
+    iend = 1.0e9
+    downsampling = 1.0e5
+elif run_type==4:
+    iend == 1.0e10
+    downsampling = 1.0e6
 
 print "Evolving until dt*iend = ", round(dt*iend,8), "s"
 time_unit= 1.0e6 # to get us
-time_unit2= 1.0e6
 time_label='time $[\mu s]$'
 
-tE1=4. # Turn off rotating wall E-field at tE1 [s]
-mm=1 # mode number for azimuthal field case
-
-# RW E-field option
-# (0) Use E=0 always, everywhere; (1) Use ideal azimuthal E-field (2) Read E-field file from  "./simion_Efields/ver.#"  
-iexe = 2
-
-If=1.0e3 #3
-Rc=0.1
-pmrwa=[4.5,]*len(pmx)
-#pmrwa=[4.0,]*len(pmx)
-pmrwf=[1.0e5,]*len(pmx) #1.0e5
-pmrwfg=[5.0e9,]*len(pmx)
-#pmrwfg=[5.0e9,]*len(pmx) #5.0e9
-pmrwd=[1.0,]*len(pmx)
-
-# Choose which electric field file to load:
-Efield_file=1 # redundant if iexe!=2
-
-# ================================================
+# ====================== Plot space and energy distributions ====================== #
 
 if plot_distr:
-    # Gaussian
+    # Gaussian in space
     distr=np.random.multivariate_normal(norm_mu,cov,1000)
     
     plt.figure()
@@ -125,7 +132,7 @@ if plot_distr:
 
     # Parallel energy
     plt.figure()
-    plt.hist(np.random.normal(Tfl,Tpar,size=10000),bins=1000)
+    plt.hist(np.random.normal(Kpar_mean,Tpar,size=10000),bins=1000)
     axes=plt.gca()
     for en in range(len(Kpar)):
         par_en=Kpar[en]
@@ -148,30 +155,23 @@ if plot_distr:
 # =================================
 pid =  os.getpid() #multiprocessing.current_process().pid
 
-if parallel_run:
-    # Run in parallel
-    def f_par(idx):
-        print "Running particle # ", idx+1
+# Run in parallel
+def f_par(idx):
+    print "Running particle # ", idx+1
         
-        res = apexd_rw_sim.bbr_sim(pmx[idx],pmy[idx],pmz[idx],Kpar[idx],Kperp[idx],pma[idx],pmrwa[idx],pmrwf[idx],pmrwfg[idx],pmrwd[idx],
-                                   dt,iend,imbk,imbk2,tE1,If,Rc,pid,iexe,mm,Efield_file)
+    res = apds.bbr_single_sim(pmx[idx],pmy[idx],pmz[idx],Kpar[idx],Kperp[idx],pma[idx],
+             rwa,rwf,rwfg,rwd,dt,iend,downsampling,tE1,If,Rc,pid+idx,iexe,mm,Efile,iexb)
         
-        return (pid,res)
+    return (pid,res)
 
-    n_cpu = multiprocessing.cpu_count()
-    pool = InterruptiblePool(processes=n_cpu if num_particles>n_cpu else num_particles)
-    out = pool.map(f_par,range(num_particles))
+n_cpu = multiprocessing.cpu_count()
+pool = InterruptiblePool(processes=n_cpu if num_particles>n_cpu else num_particles)
+out = pool.map(f_par,range(num_particles))
 
-    # Collect outputs in 'ress'. In the current version, there is none, but future updates may include some. 
-    pids = [out[i][0] for i in range(num_particles)]
-    ress = [out[i][1] for i in range(num_particles)]
+# Collect outputs in 'ress'. In the current version, there is none, but future updates may include some. 
+pids = [out[i][0] for i in range(num_particles)]
+ress = [out[i][1] for i in range(num_particles)]
     
-else:
-    # Run serially:
-    res = apexd_rw_sim.bbr_sim(pmx,pmy,pmz,Kpar,Kperp,pma,pmrwa,pmrwf,pmrwfg,pmrwd,
-                               dt,iend,imbk,imbk2,tE1,If,Rc,pid,iexe,mm,Efield_file)
-
-    pids = np.asarray([os.getpid()]*num_particles)
     
 ########## First adiabatic moment -- mu ###########
 
@@ -181,7 +181,7 @@ for nop in range(1,num_particles+1):
     mu_vars=OrderedDict()
     mu_vars['time']=[]; mu_vars['mu']=[]; mu_vars['psi']=[]
     
-    with open('./orb/mu{:04}_{:05}bbr.txt'.format(nop if parallel_run==False else 1,pids[nop-1]),'rb') as f:
+    with open('./orb/mu_{:05}bbr.txt'.format(pids[nop-1]+nop-1),'rb') as f:
         content=f.readlines()
 
     for line in content:
@@ -194,7 +194,7 @@ for nop in range(1,num_particles+1):
     for i in range(len(mu_vars)):
         mu_vars[mu_vars.keys()[i]] = np.asarray(mu_vars[mu_vars.keys()[i]])
         
-    mu_vars['time']=np.asarray(mu_vars['time'])*time_unit2
+    mu_vars['time']=np.asarray(mu_vars['time'])*time_unit
     mu_vars_all['%s'%(str(nop))] = mu_vars
     
 # plot gyro-averaged mu
@@ -209,7 +209,7 @@ for nop in range(1,num_particles+1):
     J_vars=OrderedDict()
     J_vars['time']=[]; J_vars['J']=[]; J_vars['psi']=[]
     
-    with open('./orb/jp{:04}_{:05}bbr.txt'.format(nop if parallel_run==False else 1, pids[nop-1]),'rb') as f:
+    with open('./orb/jp_{:05}bbr.txt'.format(pids[nop-1]+nop-1),'rb') as f:
         content=f.readlines()
 
     for line in content:
@@ -222,7 +222,7 @@ for nop in range(1,num_particles+1):
     for i in range(len(J_vars)):         
         J_vars[J_vars.keys()[i]] = np.asarray(J_vars[J_vars.keys()[i]])
             
-    J_vars['time']=np.asarray(J_vars['time'])*time_unit2
+    J_vars['time']=np.asarray(J_vars['time'])*time_unit
     J_vars_all['%s'%(str(nop))] = J_vars
     
 # plot J and psi
@@ -252,7 +252,7 @@ for nop in range(1,num_particles+1):
     vars['zgc']=[];vars['rgc']=[];vars['Psi_g']=[]
     vars['mu']=[];vars['nrot']=[]
 
-    with open('./orb/orb{:04}_{:05}bbr.txt'.format(nop if parallel_run==False else 1, pids[nop-1]),'rb') as f:
+    with open('./orb/orb_{:05}bbr.txt'.format(pids[nop-1]+nop-1),'rb') as f:
         content=f.readlines()
 
     for line in content:
@@ -261,6 +261,7 @@ for nop in range(1,num_particles+1):
 
         for i in range(len(vars)): 
             vars[vars.keys()[i]].append(float(elems[i]))
+            #print float(elems[i])
         
     vars['time']=np.asarray(vars['time'])*time_unit 
 
@@ -286,14 +287,15 @@ plot_3D_orbits(vars_all)
 # Plot radius of gyrocenter vs. time:
 plot_rgc(vars_all)
 
-    
+# Check phases of E-field wrt \Psi_gc    
+plot_Efield_path(vars) # latest particle
 
-
+# Compare \Psi_gc with drift-rotation frequency
+plot_Psigc_rot(vars_all,rwa,rwf,rwfg)
+                
 #####  Summary plots  #####
-summary_plots=True
-if summary_plots:
-    plot_summary_1(vars_all)
-    plot_summary_2(vars_all, pmrwa, pmrwf[0], pmrwfg[0])
+plot_summary_1(vars_all)
+plot_summary_2(vars_all, rwa, rwf, rwfg)
 
 stop
 
