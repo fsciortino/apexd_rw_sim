@@ -20,14 +20,11 @@ import warnings
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
-    from scipy import optimize
     from scipy.stats import maxwell  
     from scipy.signal import savgol_filter
-    from scipy.interpolate import interp1d
     import scipy.fftpack
-    from scipy.signal import argrelextrema
 
-# Run in virtualenv 'aenv' to use emcee
+# emcee package is used to create interruptible pool for parallelization
 from emcee.interruptible_pool import InterruptiblePool
 
 # APEX-D Particle Dynamics Simulation library
@@ -40,38 +37,40 @@ np.random.seed(433) # fix for reproducibility
 plot_distr=False
 
 # ==================== Simulation settings ========================= #
-num_particles=1
+num_particles=8
 
 # Spatial distribution in (x,y=0,z). Coil normally of radius 0.1.
 # NB: Cannot run particles on the current loop itself! 
-rad= 1e-10 #0.001
+rad= 0.001
 norm_mu=np.asarray([0.2,0.0])
 cov=np.asarray([[rad,0.0],[0.0,rad]])
 
 # Parameters for Gaussian distribution for parallel energy:
-Kpar_mean=5.0; Tpar=1.0; Tperp=1.0;
+Kpar_mean=5.0;
+#Tpar=1.0; Tperp=1.0;    # NEPOMUC Open port beam
+Tpar  = 0.015; Tperp = 0.020;    # Buffer-gas trap expected output
 
 # Time step:
 dt = 1.0e-12
 
-# Choose type of run: 0: 1us, 1: 10us, 2: 100us, 3: 1ms, 4: 10ms
-run_type = 1
+# Choose type of run: 0: 1us, 1: 20us, 2: 100us, 3: 1ms, 4: 10ms
+run_type = 2
 
-If=1.0e3      # Current \propto magnetic field intensity
+If=1.0e3 #50.0e3      # Current \propto magnetic field intensity
 Rc=0.1         # radius of coil
-rwa=4.5      # RW field amplitude
-rwf=1.0e5    # RW starting frequency
-rwfg=5.0e9   # RW frequency gradient
+rwa= 4.5      # RW field amplitude
+rwf=0.75e5 #1.0e4 #1.0e5    # RW starting frequency
+rwfg=10.0e9   # RW frequency gradient
 rwd=1.0      # RW direction: +1 -> p+ drift direction, -1 -> e- drift direction
 
 # RW E-field option: (0) Use E=0 always, everywhere;
 #                    (1) Use ideal azimuthal E-field;
 #                    (2) Read E-field file from  "./simion_Efields/ver.#". 
-#                    (3) Locally-rotating E-field vortex
+#                    (3) Locally-rotating E-field vortex (just a test)
 iexe = 2
 
-Efile=7 # Choose which electric field file to load (only used if iexe!=2)
-tE1=4. # Turn off rotating wall E-field at tE1 [s]
+Efile=1 # Choose which electric field file to load (only used if iexe!=2)
+tE1=1#8.0e-6 # Turn off rotating wall E-field at tE1 [s]
 mm=1 # mode number for azimuthal field case
 
 # B-field option: (0): Biot-Savart calculation (standard)
@@ -87,21 +86,31 @@ pmx=ttt[:,0]; pmz=ttt[:,1]
 pmy=[0.0,]*len(pmx)
 
 Kpar = np.random.normal(Kpar_mean,Tpar,num_particles)
-Kperp = maxwell.rvs(loc=0.0,scale=Tperp,size=num_particles)
+Kperp = np.random.exponential(scale=Tperp,size=num_particles)
+#maxwell.rvs(loc=0.0,scale=Tperp,size=num_particles)
 pma = 2*np.pi*np.random.random(num_particles)
 
+# Set Kpar, Kperp and pma arbitrarily (for tests)
+#Kpar = np.linspace(0.0,5, num_particles) #[2.9,]*len(pmx)
+#Kperp = [1.7,]*len(pmx)
+#pma=[0.5,]*num_particles #np.linspace(0.0,2*np.pi,num_particles)
+              
 # Get pitch angle for each particle:
 theta0 = []
 for comb in zip(Kperp,Kpar):
     vperp,vpar=comb
     theta0.append(math.atan2(vperp,vpar))
 
+print "Kpar, Kperp, pma and theta_0 for each particle:"
+for i in range(num_particles):
+    print " ---> ", Kpar[i],Kperp[i],pma[i],theta0[i]
+    
 # Depending on "run_type", set different lengths and detail of simulation
 if run_type==0:
-    iend=1.0e3 #iend = 1.0e6
+    iend=iend = 1.0e6
     downsampling = 1.0e1 
 elif run_type==1:
-    iend = 1.0e7
+    iend = 2.0e7
     downsampling = 1.0e3
 elif run_type==2:
     iend = 1.0e8
@@ -110,10 +119,10 @@ elif run_type==3:
     iend = 1.0e9
     downsampling = 1.0e5
 elif run_type==4:
-    iend == 1.0e10
+    iend = 1.0e10
     downsampling = 1.0e6
 
-print "Evolving until dt*iend = ", round(dt*iend,8), "s"
+print " Evolving until dt*iend = ", round(dt*iend,8), "s"
 time_unit= 1.0e6 # to get us
 time_label='time $[\mu s]$'
 
@@ -157,7 +166,7 @@ pid =  os.getpid() #multiprocessing.current_process().pid
 
 # Run in parallel
 def f_par(idx):
-    print "Running particle # ", idx+1
+    #print "Running particle # ", idx+1
         
     res = apds.bbr_single_sim(pmx[idx],pmy[idx],pmz[idx],Kpar[idx],Kperp[idx],pma[idx],
              rwa,rwf,rwfg,rwd,dt,iend,downsampling,tE1,If,Rc,pid+idx,iexe,mm,Efile,iexb)
@@ -229,7 +238,10 @@ for nop in range(1,num_particles+1):
 plot_bounce_averaged_J(J_vars_all)
 
 # Plot Psi_gc, mu and J next to each other:
-plot_adiabatic_conservation(mu_vars_all, J_vars_all)
+try:
+    plot_adiabatic_conservation(mu_vars_all, J_vars_all)
+except:
+    pass
 
 ############# orbits ####################
 
@@ -284,6 +296,9 @@ plot_poincare_tor(vars_all['1'])
 # plot 3D orbits:
 plot_3D_orbits(vars_all)
 
+# ... and 2D orbit projection on x-y plane:
+plot_2D_orbits(vars_all)
+               
 # Plot radius of gyrocenter vs. time:
 plot_rgc(vars_all)
 
@@ -294,20 +309,17 @@ plot_Efield_path(vars) # latest particle
 plot_Psigc_rot(vars_all,rwa,rwf,rwfg)
                 
 #####  Summary plots  #####
-plot_summary_1(vars_all)
+plot_summary_1(vars_all,dt,downsampling,time_unit)
 plot_summary_2(vars_all, rwa, rwf, rwfg)
 
 stop
 
 #### Test gyro-center approximation ####
+# Check gyrocenter approximation metrics, evaluated at the particle's position:
+get_gyrocenter_metrics(vars)
 
-gyrocenter_approx_metrics=False
-if gyrocenter_approx_metrics:
-    # Check gyrocenter approximation metrics, evaluated at the particle's position:
-    get_gyrocenter_metrics(vars)
-
-    # Check gyrocenter approximation metrics, averaged over gyro-motion:
-    get_gyrocenter_averaged_metrics(vars)
+# Check gyrocenter approximation metrics, averaged over gyro-motion:
+get_gyrocenter_averaged_metrics(vars)
 
     
 ####### Estimate radial transport  #####
@@ -317,9 +329,69 @@ if hist_transport:
 
 
 
+#################### tests
+
+Emag=np.sqrt(vars['Ex']**2+vars['Ey']**2)
+rot_angle=np.arccos(vars['xgc']/vars['rgc']) # in radians
+dt_s=np.diff(vars['time'])[0]/time_unit
+rot_freq=np.abs(np.gradient(rot_angle,dt_s ))/(2*np.pi) # in Hz
+
+# Compute E_{theta} and E_r
+E_r = vars['Ex']*np.cos(rot_angle) + vars['Ey']*np.sin(rot_angle)
+E_theta = - vars['Ex']*np.sin(rot_angle) + vars['Ey']*np.cos(rot_angle)
+vExB_r=E_theta*vars['Bz']
+vExB_tor= - E_r * vars['Bz']
+    
+# Get average rotation rate 
+hist,bin_edges = np.histogram(vars['nrot'],int(max(vars['nrot']))+1)
+
+# digitize
+inds = np.digitize(vars['nrot'], bin_edges)
+
+Etheta_means = [E_theta[inds == i].mean() for i in range(min(inds), max(inds))]
+vExB_r_means = [vExB_r[inds == i].mean() for i in range(min(inds), max(inds))]
+
+# find index of when the last complete turn begun
+endturn_idx = np.argmin(np.abs(vars['nrot'] - bin_edges[-1]))
+nrot = vars['nrot'][:endturn_idx]
+rot_time = vars['time'][:endturn_idx]
+
+# exclude last (incomplete) rotation
+hist_s=hist[1:-1]; bin_edges_s=bin_edges[1:-1]
+
+time_per_rotation = hist_s* dt * downsampling
+
+# average "nrot" per rotation should constan
+rate = 1.0/time_per_rotation
+
+# time at the start of each rotation:
+cum_rot_time = np.cumsum(time_per_rotation)*time_unit
+
+cum_rot_time0 = np.concatenate(([0,],cum_rot_time))
+
+plt.figure()
+plt.plot(cum_rot_time, rate/1.0e3,'*-')
+plt.xlabel(r'$time [\mu s]$')
+plt.ylabel(r'$\langle f_{tor} \rangle$ [kHz]')
+
+plt.figure();
+plt.plot(cum_rot_time0, Etheta_means[:-1], 's-')
+plt.xlabel(r'$time [\mu s]$')
+plt.ylabel(r'$\langle E_{\theta} \rangle$ [V/m]')
+
+plt.figure();
+plt.plot(cum_rot_time0, vExB_r_means[:-1], 's-')
+plt.xlabel(r'$time [\mu s]$')
+plt.ylabel(r'$\langle v_{E\times B, r} \rangle$ [m/s]')
 
 
+# Second method: low-pass filter of ftor
+rot_angle=np.arccos(vars['xgc']/vars['rgc']) # in radians
+dt_s=np.diff(vars['time'])[0]/time_unit
+rot_freq=np.abs(np.gradient(rot_angle,dt_s ))/(2*np.pi) # in Hz
 
+window_length = 101 #must be odd
+f_ave = savgol_filter(rot_freq,window_length,1)
 
 # =======================================
 # check if all particles have equal time vectors:

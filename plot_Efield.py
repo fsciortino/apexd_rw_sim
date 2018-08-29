@@ -16,7 +16,7 @@ mpl.rcParams['axes.labelsize'] = 14
 mpl.rcParams['axes.titlesize'] = 18
 
 version=1
-path='/home/sciortino/APEXD/simion_Efields/ver.%i/'%version
+path='/home/sciortino/APEXD/obt_1/simion_Efields/ver.%i/'%version
 file=open(path+'/e3d_hd.txt','rb')
 if version>4:
     num_electrodes=8
@@ -101,7 +101,7 @@ Eyy=np.zeros((nx+1,ny+1,len(time)))
 for t in range(len(time)):
     tp=time[t]
     for iele in range(num_electrodes):
-        Vel[iele] = amp*np.sin( 2.0*np.pi*Fel*tp + Phrw*iele*np.pi/2.0)
+        Vel[iele] = amp*np.sin( 2.0*np.pi*Fel*tp + Phrw*iele*np.pi/(num_electrodes/2.0))
         
     for nnx in range(nx+1):
         for nny in range(ny+1):

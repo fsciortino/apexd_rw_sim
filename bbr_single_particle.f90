@@ -220,7 +220,7 @@
          close(17)
 
          ! write name of E-field header file
-         write(6,*) "Read E-field file header: ",trim(Evrs)
+         !write(6,*) "Read E-field file header: ",trim(Evrs)
 
          do i=1,nx+1
             mt1x(i)=xmin+(i-1)*dx;
@@ -235,7 +235,7 @@
          do iex4=1,ielemax
             write (cf2, '("./simion_Efields/ver.", i1.1,"/e3d", i1.1, ".txt")') Evers,iex4
             ! write E-field file that was read:
-            write(6,*) "read E field file: ",trim(cf2)
+            !write(6,*) "read E field file: ",trim(cf2)
             open(17, file=cf2) ! electrode-specific data
             do iex3=1,nz+1
                do iex2=1,ny+1
@@ -409,26 +409,30 @@
          Ey = 0.0d0
          Ez = 0.0d0
          E(1)=Ex; E(2)=Ey; E(3)=Ez;
-         print "(1p3d13.5,a35)",E(1),E(2),E(3),": E (V/m) set to 0"
+         write(6,*) "Simulation with fixed E=0"
+         !print "(1p3d13.5,a35)",E(1),E(2),E(3),": E (V/m) set to 0"
       endif
 
       if (iexe == 1) then ! ideal azimuthal E-field
          call evac1(x(1),x(2),x(3),tini,tE1,mm,Ex,Ey,Ez); 
          E(1)=Ex; E(2)=Ey; E(3)=Ez;
+         write(6,*) "Activated ideal azimuthal E-field"
          ! may give (correctly) all 0s depending on starting position:
-         print "(1p3d13.5,a35)",E(1),E(2),E(3),": ideally-azimuthal E (V/m) " 
+         !print "(1p3d13.5,a35)",E(1),E(2),E(3),": ideally-azimuthal E (V/m) " 
       endif
 
       if (iexe == 2) then ! E is given by interpolation of external file data 
          call evac2(x(1),x(2),x(3),tini,tE1,Ex,Ey,Ez);
          E(1)=Ex; E(2)=Ey; E(3)=Ez;
-         print "(1p3d13.5,a35)",E(1),E(2),E(3),": E (V/m) with interpolation"
+         write(6,*) "Loading E-field data from external files"
+         !print "(1p3d13.5,a35)",E(1),E(2),E(3),": E (V/m) with interpolation"
       endif
 
       if (iexe == 3) then ! locally-rotating E-field vortex
          call evac3(x(1),x(2),x(3),tini,tE1,mm,Ex,Ey,Ez); 
          E(1)=Ex; E(2)=Ey; E(3)=Ez;
-         print "(1p3d13.5,a35)",E(1),E(2),E(3),": locally-rotating E vortex (V/m) "
+         write(6,*) "Activated locally-rotating E-field vortex"
+         !print "(1p3d13.5,a35)",E(1),E(2),E(3),": locally-rotating E vortex (V/m) "
       endif
       
 !     ##### initial velocity ####
@@ -443,10 +447,10 @@
          u(2) = xu*ydr/(dsqrt(xdr*xdr+ydr*ydr+zdr*zdr))
          u(3) = xu*zdr/(dsqrt(xdr*xdr+ydr*ydr+zdr*zdr))
 
-         print "(a35,1p3d12.4)","four-velocity (ux,uy,uz) (m):   ",u(1),u(2),u(3)
-         print "(a35,1p3d12.4)","real velocity (vx,vy,vz) (m):   ",u(1)/xgm,u(2)/xgm,u(3)/xgm
-         print "(a35,1p2d18.10)","beta and gamma:   ",xbt,xgm
-         print "(a35,1p2d18.10)","kinetic energy (eV):   ",kini
+         !print "(a35,1p3d12.4)","four-velocity (ux,uy,uz) (m):   ",u(1),u(2),u(3)
+         !print "(a35,1p3d12.4)","real velocity (vx,vy,vz) (m):   ",u(1)/xgm,u(2)/xgm,u(3)/xgm
+         !print "(a35,1p2d18.10)","beta and gamma:   ",xbt,xgm
+         !print "(a35,1p2d18.10)","kinetic energy (eV):   ",kini
       
       endif
 
@@ -459,8 +463,8 @@
       
          xv1 = xv*dsqrt(kini1/kini); ! vpara
          xv2 = xv*dsqrt(kini2/kini); ! vperp
-         print "(a35,1p3d13.5)","kinetic energy (eV), pr,pp,ttl:   ",kini1, kini2, kini
-         ! print "(a35,1p3d13.5)","velocity (m/s):   ",xv1, xv2, xv
+         !print "(a35,1p3d13.5)","kinetic energy (eV), pr,pp,ttl:   ",kini1, kini2, kini
+         !print "(a35,1p3d13.5)","velocity (m/s):   ",xv1, xv2, xv
       
          bmb1 = dsqrt( B(1)*B(1) + B(2)*B(2) + B(3)*B(3) ); 
          bmb2 = dsqrt( B(1)*B(1) + B(3)*B(3) )
@@ -476,14 +480,14 @@
 
          u(1) = v(1)*xgm; u(2) = v(2)*xgm; u(3) = v(3)*xgm;
 
-         print "(a35,1p3d13.5)","four-velocity (ux,uy,uz) (m):   ",u(1),u(2),u(3)
-         print "(a35,1p3d13.5)","real velocity (vx,vy,vz) (m):   ",v(1),v(2),v(3)
-         print "(a35,1p2d18.10)","beta and gamma:   ",xbt,xgm
+         !print "(a35,1p3d13.5)","four-velocity (ux,uy,uz) (m):   ",u(1),u(2),u(3)
+         !print "(a35,1p3d13.5)","real velocity (vx,vy,vz) (m):   ",v(1),v(2),v(3)
+         !print "(a35,1p2d18.10)","beta and gamma:   ",xbt,xgm
 
          ! Larmor radius mv/qB, v=1.75882002359937d6,B=0.01T -> 1mm
          ! write(6,*) xm*v(2)/(xe*B(3))
-         print "(a35,1p2d18.10)","gyroradius (m):",xv2/bmb1/eom
-         print "(a35,1p2d18.10)","1/f_cyc (s):",2.0d0*pi/bmb1/eom
+         !print "(a35,1p2d18.10)","gyroradius (m):",xv2/bmb1/eom
+         !print "(a35,1p2d18.10)","1/f_cyc (s):",2.0d0*pi/bmb1/eom
       
       endif
 
@@ -572,12 +576,12 @@
       if(ihit == 1) then ! stop calculation when hitting electrodes 
       
         if( dsqrt( x(1)*x(1)+x(2)*x(2) ) .gt. 0.3d0 ) then
-        write(6,*) "positron hit the wall at r=0.3m"
+        write(6,*) " ****** positron hit the wall at r=0.3m"
         go to 10
         endif
 
         if( dabs( x(3) ) .gt. 0.3d0 ) then
-        write(6,*) "positron hit the wall at z=\pm0.2m"
+        write(6,*) " ******* positron hit the wall at z=\pm0.2m"
         go to 10
         endif
 
@@ -1140,7 +1144,7 @@
 !     =================================================================
       subroutine evac1(xp,yp,zp,tp,tE1,mm,Ex,Ey,Ez)
 !        
-!     return ideal azimuthal E at (x,y,z)
+!     Return ideal azimuthal electric field at (x,y,z).
 !     This subroutine gives the ideal electrostatic field of
 !              Murakami, Sato & Hasegawa, 'Nonadiabatic behavior of the magnetic moment of a charged particle
 !                               in a dipole magnetic field', Physics of Fluids B: Plasma Physics 2, 715 (1990)
