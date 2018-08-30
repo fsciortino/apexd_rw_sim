@@ -8,14 +8,24 @@ from collections import OrderedDict
 from matplotlib.pyplot import cm
 import subprocess
 import scipy
-
+import sys
 import matplotlib as mpl
-mpl.rcParams['xtick.labelsize'] = 14
-mpl.rcParams['ytick.labelsize'] = 14
-mpl.rcParams['axes.labelsize'] = 14
-mpl.rcParams['axes.titlesize'] = 18
+mpl.rcParams['xtick.labelsize'] = 18
+mpl.rcParams['ytick.labelsize'] = 18
+mpl.rcParams['axes.labelsize'] = 18
+mpl.rcParams['axes.titlesize'] = 20
 
-version=1
+try: # give version to be plotted as command line argument
+    version=int(sys.argv[1])
+except: # or set it directly here
+    version=1
+try: # give mode number as second command line argument
+    mm = int(sys.argv[2])
+except: # or set it directly here
+    mm=1
+    
+print "Plotting SIMION E-field version: ", version, "-- mode number: ", mm
+
 path='/home/sciortino/APEXD/obt_1/simion_Efields/ver.%i/'%version
 file=open(path+'/e3d_hd.txt','rb')
 if version>4:
@@ -101,7 +111,7 @@ Eyy=np.zeros((nx+1,ny+1,len(time)))
 for t in range(len(time)):
     tp=time[t]
     for iele in range(num_electrodes):
-        Vel[iele] = amp*np.sin( 2.0*np.pi*Fel*tp + Phrw*iele*np.pi/(num_electrodes/2.0))
+        Vel[iele] = amp*np.sin( 2.0*np.pi*Fel*tp + mm*Phrw*iele*np.pi/(num_electrodes/2.0))
         
     for nnx in range(nx+1):
         for nny in range(ny+1):
@@ -119,7 +129,7 @@ X=X[skip:-skip:ss_factor,skip:-skip:ss_factor]
 Y=Y[skip:-skip:ss_factor,skip:-skip:ss_factor]
                            
 # plot rotating fields
-fig2=plt.figure(figsize=(10,12))
+fig2=plt.figure(figsize=(10,8))
 
 
 ax11 = plt.subplot(221)
