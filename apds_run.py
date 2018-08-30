@@ -37,27 +37,38 @@ np.random.seed(433) # fix for reproducibility
 plot_distr=False
 
 # ==================== Simulation settings ========================= #
-num_particles=8
+num_particles=1
 
-# Spatial distribution in (x,y=0,z). Coil normally of radius 0.1.
-# NB: Cannot run particles on the current loop itself! 
+# Beam radius at NEPOMUC origin
 rad= 0.001
-norm_mu=np.asarray([0.2,0.0])
-cov=np.asarray([[rad,0.0],[0.0,rad]])
+
+# center of beam at y=0
+x_beam_start = 0.2
+z_beam_start = 0.0
+
+# beam spatial spread factor at midplane:
+beam_spread_x = 1.0 #10.0 # set to 1 for no spreading
+beam_spread_z = 1.0 # set to 1 for no spreading
 
 # Parameters for Gaussian distribution for parallel energy:
 Kpar_mean=5.0;
-#Tpar=1.0; Tperp=1.0;    # NEPOMUC Open port beam
-Tpar  = 0.015; Tperp = 0.020;    # Buffer-gas trap expected output
+#Tpar=1.8; Tperp=0.78;    # NEPOMUC Open port beam
+Tpar = 0.015; Tperp = 0.020;    # Buffer-gas trap expected output
 
 # Time step:
 dt = 1.0e-12
 
 # Choose type of run: 0: 1us, 1: 20us, 2: 100us, 3: 1ms, 4: 10ms
-run_type = 2
+run_type = 1
 
-If=1.0e3 #50.0e3      # Current \propto magnetic field intensity
-Rc=0.1         # radius of coil
+# Define current,radius and (x,y,z) of each desired current loop
+Icl = [0.5e3,0.5e3] # total of 1e3
+rcl = [0.1,0.1]
+xcl = [0.0,0.0]
+ycl = [0.0,0.0]
+zcl = [0.0,0.00001]
+
+# Define RW electric fields
 rwa= 4.5      # RW field amplitude
 rwf=0.75e5 #1.0e4 #1.0e5    # RW starting frequency
 rwfg=10.0e9   # RW frequency gradient
@@ -81,6 +92,13 @@ iexb = 0
 # ============= Commands interpretation =============== #
 colors=cm.rainbow(np.linspace(0,1,num_particles))
 
+# center of spatial beam distribution
+norm_mu=np.asarray([x_beam_start,z_beam_start])
+
+# beam covariance matrix for injection 
+cov=np.asarray([[(rad*beam_spread_x)**2,0.0],[0.0,(rad*beam_spread_z)**2]])
+
+# sample Gaussian beam distribution
 ttt=np.random.multivariate_normal(norm_mu,cov,num_particles)
 pmx=ttt[:,0]; pmz=ttt[:,1]
 pmy=[0.0,]*len(pmx)
@@ -107,7 +125,7 @@ for i in range(num_particles):
     
 # Depending on "run_type", set different lengths and detail of simulation
 if run_type==0:
-    iend=iend = 1.0e6
+    iend= 1.0e6
     downsampling = 1.0e1 
 elif run_type==1:
     iend = 2.0e7
@@ -161,7 +179,7 @@ if plot_distr:
     plt.ylabel('Counts [a.u.]')
 
 
-# =================================
+# ======================= Parallel running ============================== #
 pid =  os.getpid() #multiprocessing.current_process().pid
 
 # Run in parallel
@@ -169,7 +187,8 @@ def f_par(idx):
     #print "Running particle # ", idx+1
         
     res = apds.bbr_single_sim(pmx[idx],pmy[idx],pmz[idx],Kpar[idx],Kperp[idx],pma[idx],
-             rwa,rwf,rwfg,rwd,dt,iend,downsampling,tE1,If,Rc,pid+idx,iexe,mm,Efile,iexb)
+                         rwa,rwf,rwfg,rwd,dt,iend,downsampling,tE1,Icl,rcl,xcl,ycl,zcl,
+                         pid+idx,iexe,mm,Efile,iexb)
         
     return (pid,res)
 

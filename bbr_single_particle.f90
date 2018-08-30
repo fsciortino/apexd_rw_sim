@@ -1,7 +1,7 @@
-!     =================================================================
+!     ======================================================================
       module mod_variable
-!     In this version, electric field files from Simion can be used.
-!    =================================================================
+!     Collection of variable definitions that are shared between subroutines
+!    =======================================================================
       implicit none
 
       double precision, parameter :: pi = 3.14159265358979323846d0
@@ -25,7 +25,7 @@
    
 !     =================================================================
       subroutine bbr_single_sim(pmx,pmy,pmz,pmk1,pmk2,pma,pmrwa,pmrwf,pmrwfg,pmrwd, &
-           dt,iend,imbk,tE1,ci1,rc1,pid,iexe,mm,Evers,iexb)  
+           dt,iend,imbk,tE1,noco,Icl_in,rcl_in,xcl_in,ycl_in,zcl_in,pid,iexe,mm,Evers,iexb)  
 !    
 !     This version was modified by FS in order to compile into a Python shared library.
 !     It differs from other versions of the code in the fact that it is optimized to run a single particle,
@@ -48,8 +48,8 @@
 !           imbk : trajectory writing rate. Every `imbk' steps data will be saved
 !           imbk2 : similar to imbk, but for the gyroaveraged \mu and bounce-averaged J
 !           tE1 : end time [seconds] for RW field. Use this to interrupt the RW field at some time during the simulation
-!           ci1 : current through the first (possibly only) current loop producing the magnetic field
-!           rc1 : radius of the first (possibly only) current loop producing the magnetic field
+!           (Icl_in,rcl_in,xcl_in,ycl_in,zcl_in) : current, radius, (x,y,z) of the current loop center.
+!                            These can be given as arrays, in which case the field from each current loop will be summer.
 !           pid : Process ID (PID) for the current run
 !           iexe : option to obtain E-field: (0) Use E=0 always, everywhere; 
 !                                            (1) Use ideal azimuthal E-field
@@ -71,33 +71,50 @@
       use mod_variable
       implicit none
   
+      double precision, INTENT(IN)        :: pmx
+      double precision, INTENT(IN)        :: pmy
+      double precision, INTENT(IN)        :: pmz
+      double precision, INTENT(IN)        :: pmk1
+      double precision, INTENT(IN)        :: pmk2
+      double precision, INTENT(IN)        :: pma
+      double precision, INTENT(IN)        :: pmrwa
+      double precision, INTENT(IN)        :: pmrwf
+      double precision, INTENT(IN)        :: pmrwfg
+      double precision, INTENT(IN)        :: pmrwd
+      double precision, INTENT(IN)        :: dt      
+      integer, INTENT(IN)                 :: iend
+      integer, INTENT(IN)                 :: imbk      
+      double precision, INTENT(IN)        :: tE1
+      integer, INTENT(IN)                 :: noco  
+      double precision, INTENT(IN)        :: Icl_in(noco)
+      double precision, INTENT(IN)        :: rcl_in(noco)
+      double precision, INTENT(IN)        :: xcl_in(noco)
+      double precision, INTENT(IN)        :: ycl_in(noco)
+      double precision, INTENT(IN)        :: zcl_in(noco)
+      integer, INTENT(IN)                 :: pid
+      integer, INTENT(IN)                 :: iexe 
+      integer, INTENT(IN)                 :: Evers  
+      integer, INTENT(IN)                 :: mm 
+      integer, INTENT(IN)                 :: iexb 
+      
+      ! Internal variables
       double precision,dimension(1:3) :: x,v
       double precision :: ken, ken1, ken2
       double precision :: Tr
       double precision, dimension(1:3) :: u,uminus,uzero,uplus
       double precision,dimension(1:3) :: B,E,Tv,Sv
       double precision :: tini,Tsq,ddt,xu,xv, kini,xdr,ydr,zdr,kini1,kini2,xpr,ypr,zpr,rsa,rPsi,rPsipr
-      double precision :: dt
-!f2py intent(in) :: dt
-      double precision :: xv1,xv2,xv1int,kang,bmb1,bmb2
+      double precision :: xv1,xv2,xv1int,kang,bmb1,bmb2,tmax,tsdiv,dt2
       double precision :: xi,yi,zi,Ex,Ey,Ez,Bx,By,Bz
-      integer :: imbk
-!f2py intent(in) :: imbk
       integer :: i,iini,Nr,itf,ifile,iclmap,iclbp,iclbp2,imu,ntr,ntrpr
-      integer :: ikene 
+      integer :: ikene,its
       double precision,dimension(1:6) :: Xr,k1,k2,k3,k4,ywork
       double precision :: Hr,xgm,xbt,Btt,Psi,Psi1,Psi2,xg1,yg1,zg1,xgpr1,ygpr1,zgpr1
       double precision :: gr,xmu
-      integer :: iend
-!f2py intent(in) :: iend
       integer :: it 
       integer t1, t2, t_rate, t_max, diff,iex1,iex2,iex3,iex4,icmp,ihit,ieout,ieoutc,iif,irsa,irsapr
       double precision,dimension(1:100005) :: elik2,elie2
-      double precision :: pmx,pmy,pmz,pmk1,pmk2,pma
-!f2py intent(in) :: pmx,pmy,pmz,pmk1,pmk2,pma
       double precision :: pmk,pmrx,pmry,pmrz
-      double precision :: pmrwa,pmrwf,pmrwfg,pmrwd
-!f2py intent(in) :: pmrwa,pmrwf,pmrwfg,pmrwd      
       character filename*128,filenameJ*128,filenamemu*128
       integer dtm(8)
       character(len=10) sys_time(3)
@@ -105,34 +122,17 @@
       character(max_line_len1) cf2, Evrs
       integer :: ist,isti
       double precision :: Vtpp1,Vtpp2,Vtpp3,Vtppn
-      integer :: pid
-!f2py intent(in) :: pid
-      double precision :: tE1
-!f2py intent(in) :: tE1
-      integer :: noco  !no.coils
-!!!!!f2py intent(in) :: noco
-      double precision :: ci1, rc1
-!f2py intent(in) :: ci1,rc1      
       integer :: mucnt ! count for gyration to compute \mu
-      integer :: iexe ! option for E-field usage
-!f2py intent(in) :: iexe
-      integer :: Evers  ! version of electric field to be loaded
-!f2py intent(in) :: Evers
-      integer :: mm ! mode number for ideal azimuthal E-field
-!f2py intent(in) :: mm
-      integer :: iexb ! option for B-field usage
-!f2py intent(in) :: iexb
       
       call system_clock(t1)   ! record starting time 
       
-!     ##### time step, step number #### in BB, variable timestep doesn't work, so its should be 0
-!     its=0 ! 0:fixed time step, 1:variable time step
-
+!     In BB algorithm, variable timestep doesn't work, so normally keep its=0
+      its=0 ! 0:fixed time step, 1:variable time step
       tini = 0.0d0
       
-!     ### for 1 ###
-!      tsdiv = 560.0d0 ! cyclotron time is divided with this number
-!      tmax = 1.0d-6 ! end of calculation
+!     For variable time step option:
+      tsdiv = 560.0d0 ! cyclotron time is divided with this number
+      tmax = 1.0d-6 ! end of calculation
 
 !     ##### Settings #####
       ikene = 2 ! 1: kene and direction ratio, 2: kpara and kperp
@@ -141,26 +141,17 @@
       icmp=1; ! 1: save extra data
       ihit=1; ! 1: stop calculation when hitting outer electrodes
       ieout=2; ! 1: warn when particle is outside of E-field region, 2: stop caculation when particle is outside E field region
-      
-!     ##### B coil current, radius, z, x, y (y is usually 0)
-      ci(1) = ci1; rc(1) = rc1; zcl(1) = 0.0d0; xcl(1) = 0.0d0; ycl(1) = 0.0d0;
-      ci(2) = 1.0d3; rc(2) = 1.0d-1; zcl(2) = 0.01d0; xcl(2) = 0.0d0; ycl(2) = 0.0d0;
-      ci(3) = 1.0d3; rc(3) = 1.0d-1; zcl(3) = 0.02d0; xcl(3) = 0.0d0; ycl(3) = 0.0d0;
-      ci(4) = 1.0d3; rc(4) = 1.0d-1; zcl(4) = 0.03d0; xcl(4) = 0.0d0; ycl(4) = 0.0d0;
-      ci(5) = 1.0d3; rc(5) = 1.0d-1; zcl(5) = 0.04d0; xcl(5) = 0.0d0; ycl(5) = 0.0d0;
-      ci(6) = 1.0d3; rc(6) = 1.0d-1; zcl(6) = -0.01d0; xcl(6) = 0.0d0; ycl(6) = 0.0d0;
-      ci(7) = 1.0d3; rc(7) = 1.0d-1; zcl(7) = -0.02d0; xcl(7) = 0.0d0; ycl(7) = 0.0d0;
-      ci(8) = 1.0d3; rc(8) = 1.0d-1; zcl(8) = -0.03d0; xcl(8) = 0.0d0; ycl(8) = 0.0d0;
-      ci(9) = 1.0d3; rc(9) = 1.0d-1; zcl(9) = -0.04d0; xcl(9) = 0.0d0; ycl(9) = 0.0d0;
-      ci(10)= 1.0d3; rc(10) = 1.0d-1; zcl(10) = -0.5d0; xcl(10) = 0.0d0; ycl(10) = 0.0d0;
-
-!     Number of coils from the above settings:
-      noco=1;
-      icln = noco; ! coil number. In the future, one may include number and parameters of coils as inputs
       iclmap = 0; ! 1: save B data 0: don't save
       
-!     B is given by subroutine calculation or linear interpolation of external file
-!      iexb=0; ! 0: Biot-Savart calculation, 1: use external B field file, 2: set Bz=0.1 everywhere
+!     ##### B coils currents, radii, (x,y,z) of coil centers
+      icln = noco
+      do i=1,noco
+         ci(i) = Icl_in(i)
+         rc(i) = rcl_in(i)
+         xcl(i) = xcl_in(i)
+         ycl(i) = ycl_in(i)
+         zcl(i) = zcl_in(i)
+      enddo
       
 !     Infer number of electrodes from given file version (hard-coding to be revised)      
       if (Evers .lt. 4) then
@@ -252,7 +243,6 @@
 !     x^0, v^0, v^-1/2 is calculated by rk4
 
 !     ################################################################################ start setup
-!     ################################################################################
       
 !     ####### set for complete elliptic functions #######
 !     Should be 1 only for the first calculation (produces .txt files in this case)
@@ -358,9 +348,8 @@
       
       endif
 !     ################################################################################ end setup
-!     ################################################################################ 
 
-      ieoutc=0 ! a constant to be used for warning outside E file region 
+      ieoutc=0 ! constant to be used for warning outside E file region 
       
       if (ikene == 2) then !    parallel and perpendicular K(eV) ------
          x(1)=pmx; x(2)=pmy; x(3)=pmz;
@@ -491,16 +480,15 @@
       
       endif
 
+!    time step in RK to calculate x^0, v^-1/2
+      if(its == 0) then ! constant time step
+         Hr = dt;
+      endif
 
-!    time step in RK to calculate x^0, v^-1/2 
-!     if(its == 0) then ! constant time step
-      Hr = dt;
-!     endif
-
-!     if(its == 1) then ! variable time step
-!     dt2 = ( 2.0d0*pi/(( dsqrt(Bx*Bx+By*By+Bz*Bz) )*eom) ) / tsdiv
-!     Hr = dt2;
-!     endif
+      if(its == 1) then ! variable time step
+         dt2 = ( 2.0d0*pi/(( dsqrt(Bx*Bx+By*By+Bz*Bz) )*eom) ) / tsdiv
+         Hr = dt2;
+      endif
 
 !      print "(1p3d10.2,a3,1p3d10.2)",x(1),x(2),x(3)," ",u(1),u(2),u(3)
 
@@ -554,7 +542,8 @@
         open (22,file=filenameJ)
         open (24,file=filenamemu)
       
-      endif
+     endif
+     
       ntr=0; ! counter for toroidal rotation 
       ntrpr=0;
       imu=0; ! saved number of mu
@@ -567,12 +556,21 @@
       do it = 0,iend+1
          
 !      time step for t^n,v^n-1/2 
-!      if(its == 0) then ! constant time step
-      Hr = dt
-      Tr = dt*it;
+      if(its == 0) then ! constant time step
+         Hr = dt
+         Tr = dt*it;
+      endif
 
-!      gr1 = dsqrt( (x(1)-gr)*(x(1)-gr)+x(2)*x(2) ) ! use x^n x^n 
+      if(its == 1) then ! variable time step
+         if (Tr.gt.tmax) go to 10 ! stop calculation when t>tmax
+         
+         ! variable time step is adjusted to cyclotron frequency
+         CALL bvac(elik2,elie2,xr(1),xr(2),xr(3),Bx,By,Bz)
+         dt2 = ( 2.0d0*pi/(( dsqrt(B(1)*B(1)+B(2)*B(2)+B(3)*B(3)) )*eom) ) / tsdiv
+         Hr = dt2
+      endif
 
+      
       if(ihit == 1) then ! stop calculation when hitting electrodes 
       
         if( dsqrt( x(1)*x(1)+x(2)*x(2) ) .gt. 0.3d0 ) then
@@ -837,9 +835,9 @@
         x(i) = x(i) + u(i)*Hr/xgm
         end do
 
-!      if(its == 1) then ! variable time step
-!      Tr = Tr + Hr
-!      endif
+      if(its == 1) then ! variable time step
+         Tr = Tr + Hr
+      endif
 
      end do
      if (ifile == 1) then
@@ -849,29 +847,19 @@
         close(25)
      endif
 
-! 10   if(its == 0) then ! variable time step
-10    print "(a35,i15,1p2d14.6)","step and time at stop, dt (s):",it-1,Tr-dt,dt
-      
-      !print "(a35,1p3d13.5)","(x,y,z):",x(1),x(2),x(3)
-      !print "(a35,1p3d13.5)","K (eV), pr,pp,ttl:",ken1,ken2,ken
-      !print "(a35,i6)","toroidal rotation:",ntrpr
-      
-!      endif
+!    Interrupted computation:
+10   write(6,*) " ----  Ended computation"
 
-!      if(its == 1) then ! variable time step
-!      print "(a35,i15,1p1d15.7)","flight step and time at stop (s):",it-1,Tr
-!      endif     
-
-
+     
       call system_clock(t2, t_rate, t_max)   ! save ending time
-       if ( t2 < t1 ) then
-      diff = (t_max - t1) + t2 + 1
-        else
-       diff = t2 - t1
-       endif
+      if ( t2 < t1 ) then
+         diff = (t_max - t1) + t2 + 1
+      else
+         diff = t2 - t1
+      endif
 
       close(21)
-!      print "(A29,F10.3,F10.3)", "### calculation time (s) (h):", diff/dble(t_rate), diff/dble(t_rate)/3600.0d0
+      print "(A29,F10.3,F10.3)", "### calculation time (s) (h):", diff/dble(t_rate), diff/dble(t_rate)/3600.0d0
 
    return
    end 
@@ -1519,7 +1507,7 @@
       ! -------------------------------------
       double precision function FEF2(k)  ! E(k)
        implicit none
-        double precision, intent(in) :: k  ! 
+        double precision, intent(in) :: k  
        double precision :: pi, m, dt, t, tmin, tmax
        integer :: i
        integer, parameter :: nmax=2000
