@@ -70,19 +70,20 @@ zcl = [0.0,0.00001]
 
 # Define RW electric fields
 rwa= 4.5      # RW field amplitude
-rwf=0.75e5 #1.0e4 #1.0e5    # RW starting frequency
+rwf=0.75e5    # RW starting frequency
 rwfg=10.0e9   # RW frequency gradient
-rwd=1.0      # RW direction: +1 -> p+ drift direction, -1 -> e- drift direction
+rwd=1.0       # RW direction: +1 -> p+ drift direction, -1 -> e- drift direction
+mm=1          # mode number
 
 # RW E-field option: (0) Use E=0 always, everywhere;
-#                    (1) Use ideal azimuthal E-field;
+#                    (1) Use Murakami's (astrophysical, ~1/r) ideal azimuthal E-field;
 #                    (2) Read E-field file from  "./simion_Efields/ver.#". 
-#                    (3) Locally-rotating E-field vortex (just a test)
+#                    (3) Use RW (~r) ideal azimuthal E-field
 iexe = 2
 
 Efile=1 # Choose which electric field file to load (only used if iexe!=2)
 tE1=1#8.0e-6 # Turn off rotating wall E-field at tE1 [s]
-mm=1 # mode number for azimuthal field case
+
 
 # B-field option: (0): Biot-Savart calculation (standard)
 #                 (1): set Bz=0.1 everywhere
@@ -330,6 +331,11 @@ plot_Psigc_rot(vars_all,rwa,rwf,rwfg)
 #####  Summary plots  #####
 plot_summary_1(vars_all,dt,downsampling,time_unit)
 plot_summary_2(vars_all, rwa, rwf, rwfg)
+
+
+# Plot polarization drifts
+get_pol_drift(vars)
+
 
 stop
 

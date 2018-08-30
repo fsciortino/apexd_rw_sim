@@ -20,6 +20,8 @@ with warnings.catch_warnings():
     from scipy.stats import binned_statistic
 
 
+
+
 ###########################
 def plot_gyro_averaged_mu(mu_vars_all, time_unit=1.0e6):
 

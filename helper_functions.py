@@ -23,6 +23,45 @@ with warnings.catch_warnings():
     from scipy.stats import binned_statistic
     from scipy.signal import savgol_filter
 
+
+##########################
+def get_pol_drift(vars, time_unit=1.0e6):
+    ''' Plot the polarization drift, using Eq. (92) of Fitzpatrick's notes:
+    http://farside.ph.utexas.edu/teaching/plasma/Plasmahtml/node17.html
+    General formulation.
+    '''
+    if time_unit==1.0e6:
+        time_label='time $[\mu s]$'
+    else:
+        time_label='time $[10^{%f} s]$'%(np.log10(1.0/time_unit))
+        
+    # Polarization drift
+    dt_s=np.diff(vars['time'])[0]/time_unit
+    omega_c = vars['B']*qe/me
+
+    # ExB drift cartesian components
+    vExB_x = (vars['Ey']*vars['Bz'] - vars['Ez']*vars['By'])/(vars['B']**2)
+    vExB_y = (-vars['Ex']*vars['Bz'] + vars['Ez']*vars['Bx'])/(vars['B']**2)
+    vExB_z = (vars['Ex']*vars['By'] - vars['Ey']*vars['Bx'])/(vars['B']**2)
+
+    # time derivatives of ExB drifts along cartesian directions
+    dvExB_x_dt = np.gradient(vExB_x,dt_s)
+    dvExB_y_dt = np.gradient(vExB_y,dt_s)
+    dvExB_z_dt = np.gradient(vExB_z,dt_s)
+
+    # polarization drift
+    vp_x = (1.0/(omega_c * vars['B'])) * (vars['By']*dvExB_z_dt - vars['Bz']*dvExB_y_dt)
+    vp_y = (1.0/(omega_c * vars['B'])) * (-vars['Bx']*dvExB_z_dt + vars['Bz']*dvExB_x_dt)
+    vp_z = (1.0/(omega_c * vars['B'])) * (vars['Bx']*dvExB_y_dt - vars['By']*dvExB_x_dt)
+
+    plt.figure()
+    plt.plot(vars['time'],vp_x/1.0e3,c='r',label=r'$v_{p,x}$')
+    plt.plot(vars['time'],vp_y/1.0e3,c='b',label=r'$v_{p,y}$')
+    plt.plot(vars['time'],vp_z/1.0e3,c='g',label=r'$v_{p,z}$')
+    plt.xlabel(r'%s'%time_label)
+    plt.ylabel(r'$v_p$ [km/s]')
+    plt.legend(fontsize=20, loc='best').draggable()
+
     
 ###########################
 def plot_gyro_averaged_mu(mu_vars_all, time_unit=1.0e6):

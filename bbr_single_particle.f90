@@ -52,9 +52,9 @@
 !                            These can be given as arrays, in which case the field from each current loop will be summer.
 !           pid : Process ID (PID) for the current run
 !           iexe : option to obtain E-field: (0) Use E=0 always, everywhere; 
-!                                            (1) Use ideal azimuthal E-field
+!                                            (1) Use astrophysically-motivated (~1/r) ideal azimuthal E-field
 !                                            (2) Read E-field file from  "./simion_Efields/ver.#";
-!                                            (3) Locally-rotating E-field vortex        
+!                                            (3) RW (~r) ideal azimuthal E-field       
 !           mm : azimuthal mode number to be used, only used when iexe=1
 !           Evers : version of the E-field file to be read from "./simion_Efields/ver.#", only used when iexe=2
 !           iexb: option to obtain B-field:  (0): Biot-Savart calculation
@@ -142,6 +142,8 @@
       ihit=1; ! 1: stop calculation when hitting outer electrodes
       ieout=2; ! 1: warn when particle is outside of E-field region, 2: stop caculation when particle is outside E field region
       iclmap = 0; ! 1: save B data 0: don't save
+      itf=0 ! 0:load&save elliptic integrals, or 1:calculate them (produces local .txt files)
+     
       
 !     ##### B coils currents, radii, (x,y,z) of coil centers
       icln = noco
@@ -240,14 +242,8 @@
 
       endif
 
-!     x^0, v^0, v^-1/2 is calculated by rk4
-
 !     ################################################################################ start setup
-      
-!     ####### set for complete elliptic functions #######
-!     Should be 1 only for the first calculation (produces .txt files in this case)
-      itf=0 ! 0:load and save, or 1:calculate elliptic functions
-
+           
 !     ##### complete elliptic functions, start ####
       if (itf.eq.1) then
          !     Calculate K(k) and E(k) and save
@@ -402,26 +398,26 @@
          !print "(1p3d13.5,a35)",E(1),E(2),E(3),": E (V/m) set to 0"
       endif
 
-      if (iexe == 1) then ! ideal azimuthal E-field
+      if (iexe == 1) then ! Murakami's (astrophysical) ideal azimuthal E-field
          call evac1(x(1),x(2),x(3),tini,tE1,mm,Ex,Ey,Ez); 
          E(1)=Ex; E(2)=Ey; E(3)=Ez;
-         write(6,*) "Activated ideal azimuthal E-field"
+         write(6,*) "Activated astrophysical ideal azimuthal E-field"
          ! may give (correctly) all 0s depending on starting position:
-         !print "(1p3d13.5,a35)",E(1),E(2),E(3),": ideally-azimuthal E (V/m) " 
+         !print "(1p3d13.5,a35)",E(1),E(2),E(3),": atrophyscical ideally-azimuthal E (V/m) " 
       endif
 
       if (iexe == 2) then ! E is given by interpolation of external file data 
-         call evac2(x(1),x(2),x(3),tini,tE1,Ex,Ey,Ez);
+         call evac2(x(1),x(2),x(3),tini,tE1,mm,Ex,Ey,Ez);
          E(1)=Ex; E(2)=Ey; E(3)=Ez;
          write(6,*) "Loading E-field data from external files"
          !print "(1p3d13.5,a35)",E(1),E(2),E(3),": E (V/m) with interpolation"
       endif
 
-      if (iexe == 3) then ! locally-rotating E-field vortex
+      if (iexe == 3) then ! RW ideal azimuthal E-field
          call evac3(x(1),x(2),x(3),tini,tE1,mm,Ex,Ey,Ez); 
          E(1)=Ex; E(2)=Ey; E(3)=Ez;
-         write(6,*) "Activated locally-rotating E-field vortex"
-         !print "(1p3d13.5,a35)",E(1),E(2),E(3),": locally-rotating E vortex (V/m) "
+         write(6,*) "Activated RW ideal azimuthal E-field"
+         !print "(1p3d13.5,a35)",E(1),E(2),E(3),": RW ideal azimuthal E-field (V/m) "
       endif
       
 !     ##### initial velocity ####
@@ -771,14 +767,14 @@
          Ez = 0.0d0
          !call evac0(x(1),x(2),x(3),it*dt,Ex,Ey,Ez)
       endif
-      if (iexe == 1) then ! ideal azimuthal E-field
+      if (iexe == 1) then ! astrophysical ideal azimuthal E-field
          call evac1(x(1),x(2),x(3),it*dt,tE1,mm,Ex,Ey,Ez)
       endif
       if (iexe == 2) then ! E is given by interpolation of external file data 
-         call evac2(x(1),x(2),x(3),it*dt,tE1,Ex,Ey,Ez)
+         call evac2(x(1),x(2),x(3),it*dt,tE1,mm,Ex,Ey,Ez)
       endif
-      if (iexe == 3) then ! locally-rotating E-field vortex
-         call evac3(x(1),x(2),x(3),it*dt,tE1,mm,Ex,Ey,Ez)
+      if (iexe == 3) then ! RW ideal azimuthal E-field
+         call evac3(x(1),x(2),x(3),tini,tE1,mm,Ex,Ey,Ez); 
       endif
       E(1)=Ex; E(2)=Ey; E(3)=Ez;
       
@@ -954,14 +950,14 @@
          Ey = 0.0d0
          Ez = 0.0d0
       endif
-      if (iexe == 1) then ! ideal azimuthal E-field
+      if (iexe == 1) then ! astrophysical ideal azimuthal E-field
          call evac1(XP,YP,ZP,T,tE1,mm,Ex,Ey,Ez);
       endif
       if (iexe == 2) then ! interpolate E in external files 
-         call evac2(XP,YP,ZP,T,tE1,Ex,Ey,Ez);
+         call evac2(XP,YP,ZP,T,tE1,mm,Ex,Ey,Ez);
       endif
-      if (iexe == 3) then ! locally-rotating E-field vortex
-         call evac3(XP,YP,ZP,T,tE1,mm,Ex,Ey,Ez); 
+      if (iexe == 3) then ! RW ideal azimuthal E-field
+         call evac3(XP,YP,ZP,T,tE1,mm,Ex,Ey,Ez);
       endif
       E(1)=Ex; E(2)=Ey; E(3)=Ez;
 
@@ -1148,7 +1144,7 @@
       double precision :: xp,yp,zp,tp,tE1,Ex,Ey,Ez
       double precision :: rr, ttheta
       double precision :: fchirp
-      integer :: mm ! mode number for ideal azimuthal E-field
+      integer          :: mm ! mode number for ideal azimuthal E-field
 
       if (tp .gt. tE1) then
          ! Zero out E field after specified time
@@ -1173,7 +1169,7 @@
 
 
 !     =================================================================
-      subroutine evac2(xp,yp,zp,tp,tE1,Ex,Ey,Ez)
+      subroutine evac2(xp,yp,zp,tp,tE1,mm,Ex,Ey,Ez)
 !
 !     Return E at (xp,yp,zp,tp) obtained by interpolation and superposition
 !     of data from a finite number of electrodes   
@@ -1188,10 +1184,9 @@
       implicit none
       double precision :: xp,yp,zp,tp,tE1,Ex,Ey,Ez
       double precision :: f111,f211,f121,f221,f112,f212,f122,f222,A1,A2,A3,A4,B1,B2
-      !double precision :: RWamp,RWfreq,RWphase
       double precision :: fchirp
-      !integer :: iex1,iex2,iex3
-
+      integer          :: mm ! mode number for ideal azimuthal E-field
+      
       if (tp .gt. tE1) then
          ! Zero out E field after specified time
          Ex=0.0d0; Ey=0.0d0; Ez=0.0d0;
@@ -1202,14 +1197,10 @@
       
       ! allow RW frequency to increase linearly (set fgrad=0 to have fixed frequency)
       fchirp = fgrad * tp + Fel
-      !Vel(1) = Vdc(1) + Vac(1)*dsin( 2.0d0*pi*fchirp*tp + Phrw*0.0d0*pi/2.0d0 )
-      !Vel(2) = Vdc(2) + Vac(2)*dsin( 2.0d0*pi*fchirp*tp + Phrw*1.0d0*pi/2.0d0 )
-      !Vel(3) = Vdc(3) + Vac(3)*dsin( 2.0d0*pi*fchirp*tp + Phrw*2.0d0*pi/2.0d0 )
-      !Vel(4) = Vdc(4) + Vac(4)*dsin( 2.0d0*pi*fchirp*tp + Phrw*3.0d0*pi/2.0d0 )
 
 !     Get electric potential at chosen position from all electrodes (consider both DC and AC potentials) 
       do iele = 1,ielemax
-         Vel(iele) = Vdc(iele) + Vac(iele)*dsin( 2.0d0*pi*fchirp*tp + Phrw*real(iele-1)*pi/2.0d0 )
+         Vel(iele) = Vdc(iele) + Vac(iele)*dsin( 2.0d0*pi*fchirp*tp + Phrw*real(mm)*real(iele-1)*pi/(real(ielemax)/2.0d0) )
       end do
    
 !     Ex by linear interpolation 
@@ -1276,9 +1267,8 @@
 !     =================================================================
       subroutine evac3(xp,yp,zp,tp,tE1,mm,Ex,Ey,Ez)
 !        
-!     return locally-rotating E-field at (x,y,z)
-!     NB: The field from this subroutine is different from the one in Murakami et al. 1990.
-!         It seems to produce interesting effects, but is not physically motivated.        
+!     Return ideal azimuthal electric field at (x,y,z) with RW radial dependence.
+!     Note that this field scales as ~r, rather than ~1/r as Murakami's field
 !        
 !     Inputs: (xp,yp,zp,tp) particle position and time;
 !             tE1: time to interrupt E-field;
@@ -1291,7 +1281,7 @@
       double precision :: xp,yp,zp,tp,tE1,Ex,Ey,Ez
       double precision :: rr, ttheta
       double precision :: fchirp
-      integer :: mm ! mode number for ideal azimuthal E-field
+      integer          :: mm ! mode number for ideal azimuthal E-field
 
       if (tp .gt. tE1) then
          ! Zero out E field after specified time
@@ -1305,8 +1295,8 @@
          ttheta = atan2(yp, xp) ! atan2 finds angle in correct quadrant
                  
          ! Assume that all electrodes are running at the same bias:
-         Ex = - (real(mm)* Vac(1)/rr) * dsin(real(mm) * ttheta - fchirp * tp)
-         Ey =  (real(mm) * Vac(1)/rr) * dcos(real(mm) * ttheta - fchirp * tp)
+         Ex = - (real(mm)* Vac(1)* rr) * dsin(real(mm) * ttheta - fchirp * tp) * dsin(ttheta)
+         Ey =  (real(mm) * Vac(1)* rr) * dsin(real(mm) * ttheta - fchirp * tp) * dcos(ttheta)
          Ez = 0.0d0
  
       endif
