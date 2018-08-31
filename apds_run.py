@@ -59,14 +59,14 @@ Tpar = 0.015; Tperp = 0.020;    # Buffer-gas trap expected output
 dt = 1.0e-12
 
 # Choose type of run: 0: 1us, 1: 20us, 2: 100us, 3: 1ms, 4: 10ms
-run_type = 1
+run_type = 2
 
 # Define current,radius and (x,y,z) of each desired current loop
 Icl = [0.5e3,0.5e3] # total of 1e3
 rcl = [0.1,0.1]
 xcl = [0.0,0.0]
 ycl = [0.0,0.0]
-zcl = [0.0,0.00001]
+zcl = [0.0,0.00000001]
 
 # Define RW electric fields
 rwa= 4.5      # RW field amplitude
@@ -79,7 +79,7 @@ mm=1          # mode number
 #                    (1) Use Murakami's (astrophysical, ~1/r) ideal azimuthal E-field;
 #                    (2) Read E-field file from  "./simion_Efields/ver.#". 
 #                    (3) Use RW (~r) ideal azimuthal E-field
-iexe = 2
+iexe = 3
 
 Efile=1 # Choose which electric field file to load (only used if iexe!=2)
 tE1=1#8.0e-6 # Turn off rotating wall E-field at tE1 [s]

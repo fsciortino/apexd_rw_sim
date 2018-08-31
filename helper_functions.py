@@ -10,12 +10,12 @@ import warnings
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import cm
 import matplotlib as mpl
-mpl.rcParams['xtick.labelsize'] = 18
-mpl.rcParams['ytick.labelsize'] = 18
-mpl.rcParams['axes.labelsize'] = 18
+mpl.rcParams['xtick.labelsize'] = 20
+mpl.rcParams['ytick.labelsize'] = 20
+mpl.rcParams['axes.labelsize'] = 20
 
-m_p = 0.910938356e-30 # e/p mass
-q_p=1.6e-19
+me=9.10938356e-31
+qe=1.6e-19
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
@@ -224,6 +224,18 @@ def plot_Psigc_rot(vars_all,rwa,rwf,rwfg,time_unit=1.0e6):
         dt_s=np.diff(vars['time'])[0]/time_unit
         rot_freq=np.abs(np.gradient(rot_angle,dt_s ))/(2*np.pi) # in Hz
 
+        # low-pass filter of rotation frequency to average over bouncing & gyration
+        window_length =int(len(vars['time'])/32.0)
+
+        if np.mod(window_length,2)==0:
+            window_length+=1
+
+        f_ave = savgol_filter(rot_freq,window_length,1)
+        if num_particles==1:
+            ccc='r'
+        else:
+            ccc=colors[nop-1]
+            
         # Compute E_{theta} and E_r
         E_r = vars['Ex']*np.cos(rot_angle) + vars['Ey']*np.sin(rot_angle)
         E_theta = - vars['Ex']*np.sin(rot_angle) + vars['Ey']*np.cos(rot_angle)
@@ -245,10 +257,11 @@ def plot_Psigc_rot(vars_all,rwa,rwf,rwfg,time_unit=1.0e6):
         ax002.set_xlabel(r'%s'%time_label)
         ax002.set_ylabel(r'$f_{tor} [kHz]$')
         ax002.plot(vars['time'],rot_freq/1.0e3,c=colors[nop-1])
+        ax002.plot(vars['time'],f_ave/1.0e3,c=ccc,linewidth=3.0)
         if rwa!=0:
             ax002.plot(vars['time'],f_RW/1.0e3,c='k',linewidth=4.0,label='$f_{RW}$')
         if nop==1:
-            leg=plt.legend(loc='best', fontsize=16).draggable()
+            leg=plt.legend(loc='best', fontsize=20).draggable()
         ax002.grid()
 
 
@@ -762,7 +775,7 @@ def get_gyrocenter_metrics(vars):
     '''
 
     # gyrofrequency:
-    w_gyro = q_p * vars['B'] / m_p
+    w_gyro = qe * vars['B'] / me
     
     plt.figure()
     plt.plot(vars['time'],w_gyro/1.0e9, 'b-')
@@ -777,7 +790,7 @@ def get_gyrocenter_metrics(vars):
     for pp in range(1,len(vars['time'])):
         
         # get v-parallel (convert parallel energy in Joules first) 
-        vpar = np.sqrt(2*vars['Kpara'][pp]*1.6e-19/m_p)
+        vpar = np.sqrt(2*vars['Kpara'][pp]*1.6e-19/me)
         
         rho = abs(vars['rgc'][pp]-vars['r'][pp])
 
@@ -845,7 +858,7 @@ def get_gyrocenter_averaged_metrics(vars):
     '''
     
     # gyrofrequency:
-    w_gyro = q_p * vars['B'] / m_p
+    w_gyro = qe * vars['B'] / me
 
     plt.figure()
     plt.plot(vars['time'],w_gyro/1.0e9, 'b-')
@@ -879,7 +892,7 @@ def get_gyrocenter_averaged_metrics(vars):
         
         # get v-parallel (convert parallel energy in Joules first)
         Kpara_Joules = np.mean(vars['Kpara'][idxs]) * 1.6e-19
-        vpar_mean = np.sqrt(2*Kpara_Joules/m_p)
+        vpar_mean = np.sqrt(2*Kpara_Joules/me)
         
         rho_mean.append(np.mean(abs(vars['rgc'][idxs]-vars['r'][idxs])))
     
